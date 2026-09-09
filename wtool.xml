@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  迁移自 mytool 的 tmux 项目（原 wsw_tmux）。
+
+  本清单只声明"应用去找的"链接；$HOME/.wtool/links/<id> 是引擎 install 时
+  自动创建、指向整个项目目录的"稳定地址"，不需要在这里声明。
+  bin/ 下的状态脚本就是通过它被 tmux.conf 引用的
+  （tmux.conf 里写 $HOME/.wtool/links/terminal/tmux/bin/*.sh）。
+
+  注意：id 是一条对外契约，出现在三处且必须一致：
+    ~/.wtool/links/<id>   、  ~/.zshrc 的 wtool 块  、  tmux.conf 里的引用。
+  改了 id 必须同步改这三处并重新 install。
+-->
+<wtool schema="1" id="terminal/tmux" priority="50">
+
+  <!-- 被 ~/.zshrc 里的 wtool 块 source；只写 zsh -->
+  <env src="env.zsh" shells="zsh"/>
+
+  <!-- dest 相对 $HOME；tmux 默认就读 ~/.tmux.conf -->
+  <link src="tmux.conf" dest=".tmux.conf"/>
+
+</wtool>
