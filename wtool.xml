@@ -13,8 +13,10 @@
 -->
 <wtool schema="1" id="terminal/tmux" priority="50">
 
-  <!-- 被 ~/.zshrc 里的 wtool 块 source；只写 zsh -->
-  <env src="env.zsh" shells="zsh"/>
+  <!-- 被 ~/.zshrc / ~/.bashrc 里的 wtool 块 source：两个 shell 各一份，
+       内容等价（这里只有 export 和 alias，两边写法一样） -->
+  <env src="env.zsh"  shells="zsh"/>
+  <env src="env.bash" shells="bash"/>
 
   <!-- dest 相对 $HOME；tmux 默认就读 ~/.tmux.conf -->
   <link src="tmux.conf" dest=".tmux.conf"/>

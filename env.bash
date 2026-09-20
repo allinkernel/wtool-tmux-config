@@ -1,4 +1,4 @@
-# 由 ~/.zshrc 里的 wtool 块 source。与 env.bash 等价（bash 版见 env.bash）。
+# 由 ~/.bashrc 里的 wtool 块 source。与 env.zsh 等价（bash 版）。
 #
 # 加载器保证以下变量已存在，所以这里不需要任何 get_this_dir 之类的路径魔法：
 #   WTOOL_PROJECT_ID    例如 terminal/tmux
