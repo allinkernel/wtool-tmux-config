@@ -35,7 +35,7 @@ for sh in bash zsh; do
     # 单独 source 时也要能用：不靠加载器导出 WTOOL_PROJECT_DIR
     chk "$sh：不设 WTOOL_PROJECT_DIR 也能 source" \
         "$(cd /tmp && "$sh" -c "source \"$proj/env.$sh\" && printf '%s\n' \"\$WTOOL_TMUX_DIR\"")" \
-        "$HOME/.wtool/links/terminal/tmux"
+        "$HOME/.wtool/wtool-work-dir/links/terminal/tmux"
 done
 
 printf '\n%d 通过, %d 失败\n' "$pass" "$fail"

@@ -21,7 +21,7 @@ bootstrap 查找顺序：`$WTOOL_BOOTSTRAP` → 向上 4 层找 `bootstrap/` 或
 
 | 动作 | 结果 |
 |---|---|
-| 建中转链接 | `~/.wtool/links/terminal/tmux` → 本仓库 |
+| 建中转链接 | `~/.wtool/wtool-work-dir/links/terminal/tmux` → 本仓库 |
 | 建软链 | `~/.tmux.conf` → 上述中转链接下的 `tmux.conf` |
 | 注入 `~/.zshrc` | 一个受管块，source `env.zsh`（导出 `WTOOL_TMUX_DIR` + `tmux-wtool` 别名） |
 
@@ -33,7 +33,7 @@ bootstrap 查找顺序：`$WTOOL_BOOTSTRAP` → 向上 4 层找 `bootstrap/` 或
 |---|---|---|
 | `wsw_env.sh` 用 `get_this_dir` 算路径 | `env.zsh` 直接用 `$WTOOL_PROJECT_DIR` | 加载器已经算好了，不再需要方言相关的路径魔法 |
 | `source` 时 `echo "WSW_TMUX_CONF_DIR is ..."` | 去掉了 | env 文件不该有副作用（会被 source 多次） |
-| `wsw.tmux.conf` 里 `$WSW_TMUX_CONF_DIR` | `$HOME/.wtool/links/terminal/tmux/bin/*.sh` | 稳定路径，不依赖 tmux server 的环境变量快照 |
+| `wsw.tmux.conf` 里 `$WSW_TMUX_CONF_DIR` | `$HOME/.wtool/wtool-work-dir/links/terminal/tmux/bin/*.sh` | 稳定路径，不依赖 tmux server 的环境变量快照 |
 | 靠 install_all.sh 复制/安装 | 只有软链 + rc 块 | 改一处即生效，不再有"两份都要改"的问题 |
 
 ## 已知问题（保持原样迁移，未改动）

@@ -2,10 +2,10 @@
 #
 # 加载器保证以下变量已存在，所以这里不需要任何 get_this_dir 之类的路径魔法：
 #   WTOOL_PROJECT_ID    例如 terminal/tmux
-#   WTOOL_PROJECT_DIR   $HOME/.wtool/links/terminal/tmux（稳定中转链接）
+#   WTOOL_PROJECT_DIR   $HOME/.wtool/wtool-work-dir/links/terminal/tmux（稳定中转链接）
 #   WTOOL_PROJECT_ROOT  仓库的真实路径
 # （单独 source 时给一份默认值，和 bootstrap/fzf 的 env 保持一致）
-[ -n "$WTOOL_PROJECT_DIR" ] || WTOOL_PROJECT_DIR="$HOME/.wtool/links/terminal/tmux"
+[ -n "$WTOOL_PROJECT_DIR" ] || WTOOL_PROJECT_DIR="$HOME/.wtool/wtool-work-dir/links/terminal/tmux"
 
 export WTOOL_TMUX_DIR="$WTOOL_PROJECT_DIR"
 
