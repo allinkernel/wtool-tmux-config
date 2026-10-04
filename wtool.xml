@@ -7,11 +7,13 @@
   bin/ 下的状态脚本就是通过它被 tmux.conf 引用的
   （tmux.conf 里写 $HOME/.wtool/wtool-work-dir/links/terminal/tmux/bin/*.sh）。
 
-  注意：id 是一条对外契约，出现在三处且必须一致：
-    ~/.wtool/wtool-work-dir/links/<id>   、  ~/.zshrc 的 wtool 块  、  tmux.conf 里的引用。
-  改了 id 必须同步改这三处并重新 install。
+  注意：**项目身份就是它的路径 `terminal/tmux`**（ADR-0037 删掉了 id= 属性），
+  它出现在三处：
+    ~/.wtool/wtool-work-dir/links/<路径>  、  ~/.zshrc 的 wtool 块  、  tmux.conf 里的引用。
+  身份**就是路径**（ADR-0037）：改目录 = 换身份，用 `wtool move` 改名，
+  别自己 mv（旧路径那套账会留在原地，`wtool check` 会报出来）。
 -->
-<wtool schema="1" id="terminal/tmux" priority="50">
+<wtool schema="1" priority="50">
 
   <!-- 被 ~/.zshrc / ~/.bashrc 里的 wtool 块 source：两个 shell 各一份，
        内容等价（这里只有 export 和 alias，两边写法一样） -->

@@ -36,9 +36,11 @@
    配置里没写解释的键位，**照配置原文写，不要编用途**（例：`unbind-key Escape`
    只照抄配置注释，并说明它在当前 tmux 版本上实测不改变行为）。
 
-5. **`wtool.xml` 里的 `id` / 链接目标是契约**：`id` 同时出现在
-   `~/.wtool/wtool-work-dir/links/<id>`、rc 的 wtool 块、`tmux.conf` 里引用 `bin/` 的
-   绝对路径三处，改一处必须三处一起改。
+5. **项目身份就是路径 `terminal/tmux`**（ADR-0037 删掉了 `id=` 属性；写了会直接报错）。
+   它同时出现在 `~/.wtool/wtool-work-dir/links/terminal/tmux`、rc 的 wtool 块、
+   `tmux.conf` 里引用 `bin/` 的绝对路径三处 —— 所以**改目录 = 换身份**，
+   要用 `wtool move terminal/tmux <新路径>`，别自己 mv
+   （旧路径那套账会留在原地，`wtool check` 会报出来）。
 
 ## README 章节结构（改了对应内容就改对应章节）
 
