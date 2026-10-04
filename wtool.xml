@@ -15,10 +15,13 @@
 
   <!-- 被 ~/.zshrc / ~/.bashrc 里的 wtool 块 source：两个 shell 各一份，
        内容等价（这里只有 export 和 alias，两边写法一样） -->
-  <env src="env.zsh"  shells="zsh"/>
-  <env src="env.bash" shells="bash"/>
+  <zshrc  src="env.zsh"/>
+  <bashrc src="env.bash"/>
 
-  <!-- dest 相对 $HOME；tmux 默认就读 ~/.tmux.conf -->
-  <link src="tmux.conf" dest=".tmux.conf"/>
+  <!-- home 是 $HOME 下的落点（写全，带 ~/）；wtool 是影子 HOME 里的那一跳，
+       subproject 是项目里的来源文件。tmux 默认就读 ~/.tmux.conf -->
+  <link home="~/.tmux.conf"
+        wtool="~/.wtool/.tmux.conf"
+        subproject="tmux.conf"/>
 
 </wtool>
