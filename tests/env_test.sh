@@ -32,10 +32,9 @@ for sh in bash zsh; do
         *"-f"*"tmux.conf"*) ok "$sh：tmux-wtool 用本项目的配置" ;;
         *) bad "$sh：tmux-wtool 别名不对 [$out]" ;;
     esac
-    # 单独 source 时也要能用：不靠加载器导出 WTOOL_PROJECT_DIR
-    chk "$sh：不设 WTOOL_PROJECT_DIR 也能 source" \
-        "$(cd /tmp && "$sh" -c "source \"$proj/env.$sh\" && printf '%s\n' \"\$WTOOL_TMUX_DIR\"")" \
-        "$HOME/.wtool/wtool-work-dir/links/terminal/tmux"
+    # 刻意**不**断言"不设 WTOOL_PROJECT_DIR 也能 source"：env 文件是 wtool install
+    # 的块 source 的，装上了这个变量一定在；没它项目本来就装不上
+    # （用户 2026-10-04 拍板，删掉了原来那条断言）。
 done
 
 printf '\n%d 通过, %d 失败\n' "$pass" "$fail"
