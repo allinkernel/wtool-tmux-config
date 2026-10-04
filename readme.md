@@ -12,5 +12,5 @@ net.sh 用来计算网络速率的方法，在部分机器上也不会生效，�
 `~/.bashrc` 里的 wtool 块 source —— 受众里有人机器上没有 zsh。
 
 ```sh
-bash tests/env_test.sh     # 7 条；没装 zsh 就只测 bash
+bash tests/env_test.sh     # 5 条；没装 zsh 就只测 bash
 ```
