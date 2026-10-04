@@ -27,6 +27,17 @@
 2. **README 里不写安装步骤。** 安装只有一句话（`wtool install terminal/tmux`）
    + 一个链接到全局唯一下载/安装入口（GitHub 上 `wtool-base/README.md`）。
    不要写 `./install.sh` 这种跑法 —— 本仓库没有那个脚本，装卸都由 wtool 调用。
+   **装 / 测只在容器里做**：本机（WSL）是临时的手工环境，wtool 调通之前不在本地落地；
+   真机上 `wtool install terminal/tmux` **必须由用户明确同意**（用户级 `~/.dsh/AGENTS.md`）。
+
+**⚠️ 当前 `ds_dev` 缺 `main` 的一条提交（2026-10-04 状态）**：`ds_dev` 是从更早的提交
+拉出来的，**没有** `main` 上的 `4d36585`（"新增快捷键"：`prefix + c` 自动分屏、
+`%` / `"` 继承工作目录）。所以 README 的键位表 13 / 14 / 15 行**在 `ds_dev` 的
+`tmux.conf` 里还不存在**，README 里有一段显式的"分支提示"讲这件事。
+**别为了对齐 `ds_dev` 把这三行删掉**（合并之后它们就是对的）；
+合并是用户的事，助手不合并。判据：`grep -cE '^(bind|bind-key|unbind|unbind-key)' tmux.conf`
+→ `ds_dev` 14、`git show main:tmux.conf | grep -cE ...` → 17。合并之后请把 README 里那段
+"分支提示"和本条一起删掉。
 
 3. **`env.zsh` 和 `env.bash` 必须同改。** 改名、改报错文字、改默认值，两边一起改，
    并且 `tests/env_test.sh` 用同一张用例表测两个 shell。只改一份 = 装了一半。
@@ -60,24 +71,33 @@
 ## 测试
 
 ```sh
-cd terminal/tmux && bash tests/env_test.sh   # 5 条，应全绿
+cd terminal/tmux && bash tests/env_test.sh   # 5 条，应全绿（条数以输出为准）
 ```
 
 只读、不碰 `$HOME`、不联网。改完 `env.zsh` / `env.bash` 必须跑。
 
 **改 `tmux.conf` 之后建议再做一次实测**（配置能不能被 tmux 解析、键位到底生效成什么），
-这套命令不用真终端、用完自己清掉：
+这套命令不用真终端、用完自己清掉。**注意要 dump 两张表**：`-n` 的绑定落在 **root 表**
+（tmux 会把它规范化成 `bind-key -T root ...`），只 diff prefix 表会漏掉 Alt 那一批：
 
 ```sh
 cd terminal/tmux
-export TMUX_TMPDIR=$(mktemp -d)                     # 别碰用户自己的 tmux server
+export TMUX_TMPDIR=$(mktemp -d)                       # 别碰用户自己的 tmux server
 tmux -L probe -f "$PWD/tmux.conf" new-session -d -x 200 -y 50
-tmux -L probe list-keys -T prefix > /tmp/conf.txt   # 和默认表对比：
-tmux -L dflt  -f /dev/null new-session -d -x 200 -y 50
-tmux -L dflt  list-keys -T prefix > /tmp/dflt.txt
-diff /tmp/dflt.txt /tmp/conf.txt                    # 这份 diff 就是本配置改动的全部键位
+tmux -L dflt  -f /dev/null        new-session -d -x 200 -y 50
+for t in prefix root; do
+    tmux -L probe list-keys -T $t > /tmp/conf-$t.txt
+    tmux -L dflt  list-keys -T $t > /tmp/dflt-$t.txt
+    diff /tmp/dflt-$t.txt /tmp/conf-$t.txt
+done
 tmux -L probe kill-server; tmux -L dflt kill-server
 ```
+
+实测（2026-10-04，tmux 3.4，`ds_dev` 的 `tmux.conf`）：
+`-T prefix` 的 diff **只有 1 行**（`< bind-key -T prefix Space next-layout`，被 `unbind` 掉），
+`-T root` 的 diff **是 12 行**（Alt / Alt+Ctrl 系列），
+而 `unbind-key Escape` **一行都不出现** —— 默认 prefix 表里本来就没有 `Escape`。
+这三条合起来正好对得上 README 里"`ds_dev` 14 条"那个数。
 
 ## 提交
 

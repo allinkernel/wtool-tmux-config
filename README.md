@@ -22,7 +22,13 @@
 > **[wtool-base/README.md](https://github.com/allinkernel/wtool/blob/main/README.md)**
 
 （URL 由清单 `.repo/manifests/default.xml` 里的 remote `ssh://git@github.com/`
-+ 项目名 `allinkernel/wtool.git` + 默认 revision `main` 拼出，不是猜的。）
++ 项目名 `allinkernel/wtool.git` + 默认 revision `main` 拼出，不是猜的：
+`sed -n '4,5p' .repo/manifests/default.xml` 就是 `<remote name="github" fetch="ssh://git@github.com/" />`
+和 `<default revision="main" remote="github" .../>`。）
+
+> ⚠️ **wtool 的项目只在容器里装 / 测**（用户级规矩，2026-10-04）：本机（WSL）是临时
+> 的手工环境，wtool 彻底调通之前**不在本地落地**。要在容器里验证就 `--network=host`
+> 挂工作区；**真机上装本项目必须由用户明确同意**，助手不得自行 `wtool install`。
 
 `wtool install` 按 `wtool.xml` 的声明做两件事：
 
@@ -75,19 +81,23 @@
 | 10 | `Alt+Ctrl+j` | — | 向**下**扩 5 格 | `resize-pane -D 5` |
 | 11 | `Alt+Ctrl+k` | — | 向**上**扩 5 格 | `resize-pane -U 5` |
 | 12 | `Alt+Ctrl+l` | — | 向**右**扩 5 格 | `resize-pane -R 5` |
-| 13 | `Ctrl-b` `c` | prefix | 新建窗口，**并立刻自动分成 4 个 pane**（布局见下） | 覆盖 tmux 默认的 `c`（默认只新建一个 pane） |
-| 14 | `Ctrl-b` `%` | prefix | 左右分屏，**新 pane 继承当前 pane 的工作目录** | 覆盖默认 `%`（默认不继承目录） |
-| 15 | `Ctrl-b` `"` | prefix | 上下分屏，**新 pane 继承当前 pane 的工作目录** | 覆盖默认 `"`（默认不继承目录） |
+| 13 | `Ctrl-b` `c` | prefix | 新建窗口，**并立刻自动分成 4 个 pane**（布局见下） | 覆盖 tmux 默认的 `c`（默认只新建一个 pane）。**只在 `main` 上**，`ds_dev` 还没有 —— 见下面的分支提示 |
+| 14 | `Ctrl-b` `%` | prefix | 左右分屏，**新 pane 继承当前 pane 的工作目录** | 覆盖默认 `%`（默认不继承目录）。**只在 `main` 上** |
+| 15 | `Ctrl-b` `"` | prefix | 上下分屏，**新 pane 继承当前 pane 的工作目录** | 覆盖默认 `"`（默认不继承目录）。**只在 `main` 上** |
 | 16 | `Ctrl-b` `Space` | prefix | **解绑**（原默认动作是 `next-layout`，切换 pane 布局） | `unbind Space` |
 | 17 | `Ctrl-b` `Escape` | prefix | **解绑** | `unbind-key Escape`；配置注释写的是"Esc+hjkl 也会切换 panel，这在使用 vim 时会导致问题"。⚠️ 本机 tmux 3.4 的**默认前缀表里本来就没有 `Escape`**（`tmux list-keys -T prefix` 实测），所以这一条在当前版本**不改变任何行为** |
 
-> 数一下：`tmux.conf` 里一共 **17 条**键位声明 —— 12 条 `bind-key -n`（Alt 系列）
-> + 3 条 `bind-key`（`c` / `%` / `"`）+ 2 条解绑（`unbind Space` / `unbind-key Escape`）。
+> 数一下（核过的两个数）：**`main` 上 17 条**键位声明 —— 12 条 `bind-key -n`（Alt 系列）
+> + 3 条 `bind-key`（`c` / `%` / `"`）+ 2 条解绑（`unbind Space` / `unbind-key Escape`）；
+> **`ds_dev` 上 14 条** —— 少了第 13 / 14 / 15 那三条。
+> 判据：`grep -cE '^(bind|bind-key|unbind|unbind-key)' tmux.conf` → `ds_dev` 14；
+> `git show main:tmux.conf | grep -cE '^(bind|bind-key|unbind|unbind-key)'` → 17。
 
 > ⚠️ **分支提示（把 `main` 合进 `ds_dev` 之后请删掉这一段）**：`ds_dev` 是从更早的提交
 > 拉出来的，**还没有** `main` 上的 `4d36585`（"新增快捷键"）—— 所以上面第 **13 / 14 / 15**
 > 条（`prefix + c` / `%` / `"`）在 `ds_dev` 当前的 `tmux.conf` 里**还不存在**，只在 `main` 上。
 > 本节是按 `main` 的内容写的；`ds_dev` 现在只有 14 条（少这 3 条）。
+> **别为了对齐 `ds_dev` 把这三行删掉** —— 合并之后它们就是对的（合并不由助手做，用户决定）。
 
 #### 第 13 条的自动分屏布局（实测）
 
@@ -122,7 +132,7 @@
 | `status-left` | 三个脚本串联 | 见下 |
 | `status-left-style` | `bg=magenta fg=black` | 左半段配色 |
 | `status-left-length` | `90` | 左半段最大宽度 |
-| `status-right-style` | `bg=yellow` | 右半段配色。**只设了颜色**：`status-right` 内容没有设 → 保持 tmux 默认（`"#{=21:pane_title}" %H:%M %d-%b-%y`） |
+| `status-right-style` | `bg=yellow` | 右半段配色。**只设了颜色**：`status-right` 内容没有设 → 保持 tmux 默认。tmux 3.4 的默认值实测是 `#{?window_bigger,[#{window_offset_x}#,#{window_offset_y}] ,}"#{=21:pane_title}" %H:%M %d-%b-%y`（`tmux show-options -g status-right`） |
 | `window-status-current-style` | `bg=blue, fg=white` | 当前窗口标签：蓝底白字 |
 | `window-status-style` | `fg=black` | 其他窗口标签：黑字 |
 | `window-status-separator` | `\|` | 窗口之间用竖线分隔（默认空格） |
@@ -157,16 +167,16 @@
 
 | 问题 | 说明 |
 |---|---|
-| `bin/disk.sh` 的 `while read` 在管道子 shell 里跑 | `msg` / `brief_msg` 的赋值出不了子 shell，最终输出可能是 `[]`。原 mytool 版本就有，迁移时故意没改以免混入行为变更 |
-| `bin/net.sh` 硬编码网卡名 `ens33` | 原作者注释已说明"部分机器不生效"；而且它没被 `tmux.conf` 引用 |
-| `bin/disk.sh` / `mem.sh` / `net.sh` 的 shebang 是 `/usr/bin/zsh` | 依赖 zsh 存在；不需要可以改 `#!/bin/bash` |
+| `bin/disk.sh` 的 `while read` 在**管道**里跑 | ⚠️ **原结论已订正**（旧 README 在 `f364365` 里写成"赋值出不了子 shell，最终输出可能是 `[]`"，那是**错的**）：脚本自己的 shebang 是 **zsh**，而 zsh 让管道**最后一段在当前 shell 里跑**，赋值留得下来，输出是对的。只有**换 bash/dash 跑**才会出 `[]`。判据：`zsh bin/disk.sh` → `[C:\16G D:\300G E:\1.5T ]`；`bash bin/disk.sh` → `[]`（zsh 5.9 实测）。反正 `tmux.conf` 的 `#()` 走 shebang，行为是对的 —— 保持原样不改 |
+| `bin/net.sh` 硬编码网卡名 `ens33` | 原 `readme.md` 写着"在部分机器上也不会生效，所以我打算放弃"；而且它没被 `tmux.conf` 引用 |
+| `bin/disk.sh` / `mem.sh` / `net.sh` 的 shebang 是 `/usr/bin/zsh` | 依赖 zsh 存在；不需要可以改 `#!/bin/bash`（但见上面第一条：改了 `disk.sh` 的 shell，输出就会变成 `[]`） |
 | 原 `readme.md` 写着"`process.sh` 用来计算 cpu 占用率的方法，在 wsl1 上不会生效" | **仓库里没有 `process.sh`**（`git ls-files` 只有 cpu / disk / mem / net 四个脚本）。现在的 `bin/cpu.sh` 读 `/proc/loadavg`，是否在 wsl1 上生效**未核实** |
 
 ## 测试
 
 ```sh
 bash tests/env_test.sh     # 5 条：env.zsh / env.bash 给出同样的变量和别名
-                           # 没装 zsh 就只测 bash
+                           # （条数以输出为准）没装 zsh 就只测 bash
 ```
 
 ## 迁移历史
