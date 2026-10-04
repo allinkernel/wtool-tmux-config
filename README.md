@@ -48,6 +48,7 @@
 | `bin/*.sh` | 状态栏脚本（cpu / mem / disk / net），由 `tmux.conf` 的 `#()` 调用 |
 | `wtool.xml` | 清单：1 个 `~/.tmux.conf` 链接 + zsh / bash 两份 env |
 | `tests/env_test.sh` | env 两份等价的测试 |
+| `BACKLOG.md` | 这个项目"接下来做什么、哪条待拍板"（助手看） |
 
 ### shell 集成
 
