@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "project": "terminal/tmux",
+  "repo": "allinkernel/wtool-tmux-config",
+  "tag": "ds_dev-2026-10-07",
+  "base_url": "https://github.com/allinkernel/wtool-tmux-config/releases/download/ds_dev-2026-10-07",
+  "commit": "81a7ea26459d560d8891284a3d31e997b8522dbb",
+  "packed_at": "2026-10-08T01:05:12+0800",
+  "published_at": "2026-10-08T01:07:52+08:00",
+  "wtool_engine": "1.0.0",
+  "dirty": false,
+  "volume_size": "32M",
+  "declare": [
+    "wtool.xml",
+    "env.zsh",
+    "env.bash"
+  ],
+  "targets": [],
+  "assets": [
+    {
+      "name": "dist.json",
+      "role": "",
+      "bytes": 930,
+      "sha256": "010bbe6c60024c3987363b20836220e4b8392f77850c33376f97db93ff28f39a"
+    },
+    {
+      "name": "release-hash.txt",
+      "role": "",
+      "bytes": 78,
+      "sha256": "930d54297445a549b3dd63d24fd2d12df2b5018cd3cb8dfc722a0f5498dfbb3e"
+    },
+    {
+      "name": "release.zip",
+      "role": "release",
+      "bytes": 2210,
+      "sha256": "6993ea4095ad4030fd6fc41380e32a81ae9507cebbbc5dd142e410761e788512"
+    },
+    {
+      "name": "源码-hash.txt",
+      "role": "",
+      "bytes": 77,
+      "sha256": "5df2d4117aaed3b21ec5cb3666ca8c054f6fce5119dc71396bb2a33e9943acb5"
+    },
+    {
+      "name": "源码.zip",
+      "role": "source",
+      "bytes": 18705,
+      "sha256": "b50cc65c58c4e2c2a8c3559ad5ef6c0e50c6cd956a4d1d6d867945c8d59226ca"
+    }
+  ],
+  "how": "wtool download-release terminal/tmux   # 下到项目的 __release/（按本文件的 sha256 校验）\nwtool unpack-release terminal/tmux     # 拼分卷 + 解到 __output/\nwtool install terminal/tmux            # 装到本机"
+}
