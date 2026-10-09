@@ -2,11 +2,11 @@
   "schema": 1,
   "project": "terminal/tmux",
   "repo": "allinkernel/wtool-tmux-config",
-  "tag": "ds_dev-2026-10-07",
-  "base_url": "https://github.com/allinkernel/wtool-tmux-config/releases/download/ds_dev-2026-10-07",
-  "commit": "81a7ea26459d560d8891284a3d31e997b8522dbb",
-  "packed_at": "2026-10-08T01:05:12+0800",
-  "published_at": "2026-10-08T01:07:52+08:00",
+  "tag": "ds_dev-2026-10-09",
+  "base_url": "https://github.com/allinkernel/wtool-tmux-config/releases/download/ds_dev-2026-10-09",
+  "commit": "dae6b1e2c5798ebce0f5c2441a024f2db05d4a63",
+  "packed_at": "2026-10-09T15:32:09+0800",
+  "published_at": "2026-10-09T15:32:42+08:00",
   "wtool_engine": "1.0.0",
   "dirty": false,
   "volume_size": "32M",
@@ -20,33 +20,21 @@
     {
       "name": "dist.json",
       "role": "",
-      "bytes": 930,
-      "sha256": "010bbe6c60024c3987363b20836220e4b8392f77850c33376f97db93ff28f39a"
+      "bytes": 866,
+      "sha256": "47a6bd8a82eebef808641187db7912ef301480f8877df435a4669f4084ebd94b"
     },
     {
-      "name": "release-hash.txt",
-      "role": "",
-      "bytes": 78,
-      "sha256": "930d54297445a549b3dd63d24fd2d12df2b5018cd3cb8dfc722a0f5498dfbb3e"
-    },
-    {
-      "name": "release.zip",
-      "role": "release",
-      "bytes": 2210,
-      "sha256": "6993ea4095ad4030fd6fc41380e32a81ae9507cebbbc5dd142e410761e788512"
-    },
-    {
-      "name": "源码-hash.txt",
+      "name": "source-hash.txt",
       "role": "",
       "bytes": 77,
-      "sha256": "5df2d4117aaed3b21ec5cb3666ca8c054f6fce5119dc71396bb2a33e9943acb5"
+      "sha256": "3f879def216a2539cf113d8d8a7275dbf2f5a8f1fc7d172d1c6fc3e9493f6173"
     },
     {
-      "name": "源码.zip",
+      "name": "source.zip",
       "role": "source",
-      "bytes": 18705,
-      "sha256": "b50cc65c58c4e2c2a8c3559ad5ef6c0e50c6cd956a4d1d6d867945c8d59226ca"
+      "bytes": 20098,
+      "sha256": "e5e09b9cf814e33c4665689a52ab3be6df0887fc479cf4319ffca6c4800c6cae"
     }
   ],
-  "how": "wtool download-release terminal/tmux   # 下到项目的 __release/（按本文件的 sha256 校验）\nwtool unpack-release terminal/tmux     # 拼分卷 + 解到 __output/\nwtool install terminal/tmux            # 装到本机"
+  "how": "wtool download-release terminal/tmux   # 下到项目的 __release/（按本文件的 sha256 校验）\nwtool unpack-release terminal/tmux     # 拼分卷 + 把源码铺回项目目录\nwtool install terminal/tmux            # 装到本机"
 }
