@@ -7,14 +7,17 @@
 
 一份 tmux 配置 + 两个 shell 的 env 片段。**它是 wtool 的子项目**：装、卸都由 wtool
 按 `wtool.xml` 的声明执行，仓库里**没有** `install.sh` / `uninstall.sh`。
+按 ADR-0045 的分类，它是**① 类纯源码项目**（`kind` 缺省 = `source`）：源码即产物，
+不渲染、不生成、不进 `__output`。**现状**见 `architecture.md`。
 
 | 文件 | 是干什么的 |
 |---|---|
-| `tmux.conf` | 配置本体，wtool 软链到 `~/.tmux.conf` |
-| `env.zsh` / `env.bash` | 两个 shell 各一份、**内容必须等价**（有人机器上没有 zsh） |
-| `bin/*.sh` | 状态栏脚本，被 `tmux.conf` 的 `#()` 按稳定地址调用 |
-| `wtool.xml` | 清单：`~/.tmux.conf` 链接 + 两份 env |
-| `tests/env_test.sh` | env 等价的测试 |
+| `tmux.conf` | 配置本体；由 `env.*` 里的 `tmux()` 包装函数用 `-f` 指定（**不再软链到 `~/.tmux.conf`**） |
+| `env.zsh` / `env.bash` | 两个 shell 各一份、**内容必须等价**（有人机器上没有 zsh）；含 `tmux()` 包装函数与 `WTOOL_HOME` 校验 |
+| `bin/*.sh` | 状态栏脚本，被 `tmux.conf` 的 `#()` 按 L1 路径调用 |
+| `wtool.xml` | 清单：**只有两份 env 声明**（① 类纯源码，没有 `<link>`、没有 `<export_*>`） |
+| `architecture.md` | 这个项目**现在长什么样**（链接形态、两个 shell 的约定） |
+| `tests/env_test.sh` | 清单/配置形状 + env 等价的测试 |
 
 ## 铁律
 
@@ -48,10 +51,18 @@
    只照抄配置注释，并说明它在当前 tmux 版本上实测不改变行为）。
 
 5. **项目身份就是路径 `terminal/tmux`**（ADR-0037 删掉了 `id=` 属性；写了会直接报错）。
-   它同时出现在 `~/.wtool/wtool-work-dir/links/terminal/tmux`、rc 的 wtool 块、
-   `tmux.conf` 里引用 `bin/` 的绝对路径三处 —— 所以**改目录 = 换身份**，
+   它同时出现在 L1 链 `$WTOOL_HOME/wtool/terminal/tmux`、rc 的 wtool 块 source 的 env 文件、
+   以及 `tmux.conf` / `env.*` 里引用的路径三处 —— 所以**改目录 = 换身份**，
    要用 `wtool move terminal/tmux <新路径>`，别自己 mv
    （旧路径那套账会留在原地，`wtool check` 会报出来）。
+
+6. **`tmux.conf` 里的 `$WTOOL_HOME` 只有一种写法可用**（2026-10-13 实测，tmux 3.4）：
+   `#(sh -c 'exec "$WTOOL_HOME/…"')`。实测**不能**改成 `${VAR:-默认}`（整行 `set`
+   直接失效、`status-left` 退回 tmux 默认值），也不能写 `\$VAR`（反斜杠会留给 `sh`，
+   路径解析不出来）。另外 `tmux -f <不存在的文件>` **不报错**（静默用默认配置），
+   所以 `WTOOL_HOME` 指错会表现成"命令能跑、配置没在"。
+   细节、判据和当时怎么测的都写在 `architecture.md` §3 和 README「已知问题」里 ——
+   动这几行之前先读那两处。
 
 ## README 章节结构（改了对应内容就改对应章节）
 
@@ -60,7 +71,7 @@
 | （开头一段） | 这个配置提供什么 | `tmux.conf` 的选项 |
 | `## 安装` | 一句话 + wtool-base 链接 | `wtool.xml` |
 | `## 功能说明` → `### 文件` | 每个文件干什么 | `git ls-files` |
-| `## 功能说明` → `### shell 集成` | `WTOOL_TMUX_DIR` / `tmux-wtool` / 兜底默认值 | `env.zsh`、`env.bash` |
+| `## 功能说明` → `### shell 集成` | `tmux()` 包装函数 / `WTOOL_TMUX_DIR` / `tmux-wtool` / `WTOOL_HOME` 校验 / 兜底默认值 | `env.zsh`、`env.bash` |
 | `## 功能说明` → `### 快捷键功能` | **逐条键位表**（前缀键、Alt 系列、`c`/`%`/`"`、两条解绑、自动分屏几何） | `tmux.conf` |
 | `## 功能说明` → `### 状态栏` | `status-*` 选项 + 三个 `bin/*.sh` | `tmux.conf`、`bin/` |
 | `## 功能说明` → `### 选项设置` | 改了 tmux 默认值的那些选项（含默认值对照） | `tmux.conf` |
@@ -71,10 +82,13 @@
 ## 测试
 
 ```sh
-cd terminal/tmux && bash tests/env_test.sh   # 5 条，应全绿（条数以输出为准）
+cd terminal/tmux && bash tests/env_test.sh   # 29 条，应全绿（2026-10-13 实测；条数以输出为准）
 ```
 
-只读、不碰 `$HOME`、不联网。改完 `env.zsh` / `env.bash` 必须跑。
+只读、不碰 `$HOME`、不联网。它测三类东西：① 清单/配置形状（`wtool.xml` 没有 `<link>` /
+`<export_*>`、`tmux.conf` 与 `env.*` 里没有废弃的 `wtool-work-dir/links`、状态栏走
+`$WTOOL_HOME/…`）② 两个 shell **同一张表**（`tmux()` 传了什么参数、`WTOOL_HOME` 三种坏值
+都报错退出）③ `WTOOL_TMUX_DIR` / `tmux-wtool` 还在。改完 `env.zsh` / `env.bash` 必须跑。
 
 **改 `tmux.conf` 之后建议再做一次实测**（配置能不能被 tmux 解析、键位到底生效成什么），
 这套命令不用真终端、用完自己清掉。**注意要 dump 两张表**：`-n` 的绑定落在 **root 表**
@@ -83,6 +97,7 @@ cd terminal/tmux && bash tests/env_test.sh   # 5 条，应全绿（条数以输�
 ```sh
 cd terminal/tmux
 export TMUX_TMPDIR=$(mktemp -d)                       # 别碰用户自己的 tmux server
+export WTOOL_HOME=${WTOOL_HOME:-$HOME/.wtool}         # 状态栏那三条 #() 要用它找 bin/*.sh
 tmux -L probe -f "$PWD/tmux.conf" new-session -d -x 200 -y 50
 tmux -L dflt  -f /dev/null        new-session -d -x 200 -y 50
 for t in prefix root; do
@@ -90,6 +105,7 @@ for t in prefix root; do
     tmux -L dflt  list-keys -T $t > /tmp/dflt-$t.txt
     diff /tmp/dflt-$t.txt /tmp/conf-$t.txt
 done
+tmux -L probe show-options -g status-left             # 看 $WTOOL_HOME 展开成了什么
 tmux -L probe kill-server; tmux -L dflt kill-server
 ```
 

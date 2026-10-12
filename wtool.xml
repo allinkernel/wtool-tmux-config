@@ -2,28 +2,28 @@
 <!--
   迁移自 mytool 的 tmux 项目（原 wsw_tmux）。
 
-  本清单只声明"应用去找的"链接；$HOME/.wtool/wtool-work-dir/links/<id> 是引擎 install 时
-  自动创建、指向整个项目目录的"稳定地址"，不需要在这里声明。
-  bin/ 下的状态脚本就是通过它被 tmux.conf 引用的
-  （tmux.conf 里写 $HOME/.wtool/wtool-work-dir/links/terminal/tmux/bin/*.sh）。
+  **① 类纯源码项目**（`kind` 缺省就是 `source`，ADR-0045 §1.4 / D46）：
+  配置与脚本都是源码自带的 —— **不渲染、不生成、不进 __output / __release**，
+  也不写 <export_*> / <generate>。运行时只靠两条：
+    · L1 链   $WTOOL_HOME/wtool/terminal/tmux  →  本目录（`wtool install` 时建）
+    · env 块  把 env.zsh / env.bash 并进 $WTOOL_HOME/env.{zsh,bash}
+
+  **本清单没有 <link>**（2026-10-13，ADR-0045 / D3：新模型删掉了 <link> 的解析，
+  不留兼容期）。原来那条 `~/.tmux.conf` 软链由 env 里的 `tmux()` 包装函数取代（D10）：
+    tmux() { command tmux -f "$WTOOL_HOME/wtool/terminal/tmux/tmux.conf" "$@"; }
+  `tmux.conf` 里状态栏那三个脚本也走同一条 L1 路径
+  （`$WTOOL_HOME/wtool/terminal/tmux/bin/*.sh`，实测见 tests/env_test.sh 与 README）。
 
   注意：**项目身份就是它的路径 `terminal/tmux`**（ADR-0037 删掉了 id= 属性），
-  它出现在三处：
-    ~/.wtool/wtool-work-dir/links/<路径>  、  ~/.zshrc 的 wtool 块  、  tmux.conf 里的引用。
-  身份**就是路径**（ADR-0037）：改目录 = 换身份，用 `wtool move` 改名，
+  它出现在三处：L1 链的落点、rc 里 wtool 块 source 的 env 文件、tmux.conf 里的引用。
+  身份**就是路径**：改目录 = 换身份，用 `wtool move terminal/tmux <新路径>` 改名，
   别自己 mv（旧路径那套账会留在原地，`wtool check` 会报出来）。
 -->
 <wtool schema="1" priority="50">
 
-  <!-- 被 ~/.zshrc / ~/.bashrc 里的 wtool 块 source：两个 shell 各一份，
-       内容等价（这里只有 export 和 alias，两边写法一样） -->
+  <!-- 被 $WTOOL_HOME/env.zsh / env.bash 里的 wtool 块 source：两个 shell 各一份，
+       内容等价（这里只有 export、函数和别名，两边写法一样） -->
   <zshrc  src="env.zsh"/>
   <bashrc src="env.bash"/>
-
-  <!-- home 是 $HOME 下的落点（写全，带 ~/）；wtool 是影子 HOME 里的那一跳，
-       subproject 是项目里的来源文件。tmux 默认就读 ~/.tmux.conf -->
-  <link home="~/.tmux.conf"
-        wtool="~/.wtool/.tmux.conf"
-        subproject="tmux.conf"/>
 
 </wtool>

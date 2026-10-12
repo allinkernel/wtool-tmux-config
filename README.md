@@ -7,8 +7,10 @@
 * **`prefix + c`** 新建窗口时自动把窗口分成左 25% + 中间 50%（上下 30/70）+ 右 25%；
 * 鼠标直接可用（选中、滚动、拖边框），历史缓冲 5000 行。
 
-配置本体是 `tmux.conf`，由 wtool 软链到 `~/.tmux.conf` —— 也就是**装完之后 tmux
-默认就读它**，不需要 `-f` 指定。
+配置本体是 `tmux.conf`。装完之后**敲 `tmux` 就是这份配置** —— 靠 `env.zsh` / `env.bash`
+里的包装函数 `tmux() { command tmux -f "$WTOOL_HOME/wtool/terminal/tmux/tmux.conf" "$@"; }`。
+（ADR-0045 的新链接模型里 `$HOME` **不再有** wtool 建的软链，原先那条 `~/.tmux.conf`
+已经删掉 —— 见「shell 集成」和「已知问题」。）
 
 > 本仓库是 wtool 的子项目：**装、卸都由 wtool 按 `wtool.xml` 的声明完成**。
 > 本仓库没有（也不需要）手工跑的 `install.sh` / `uninstall.sh`。
@@ -30,12 +32,19 @@
 > 的手工环境，wtool 彻底调通之前**不在本地落地**。要在容器里验证就 `--network=host`
 > 挂工作区；**真机上装本项目必须由用户明确同意**，助手不得自行 `wtool install`。
 
-`wtool install` 按 `wtool.xml` 的声明做两件事：
+`wtool install` 按 `wtool.xml` 的声明做两件事（**都不往 `$HOME` 里放配置文件**）：
 
-1. 把 `tmux.conf` 软链到 `~/.tmux.conf`；
-2. 往 `~/.zshrc` / `~/.bashrc` 各注入一个受管块，分别 source `env.zsh` / `env.bash`。
+1. 建 **L1 链** `$WTOOL_HOME/wtool/terminal/tmux` → 本仓库这个目录 ——
+   `tmux.conf` 与 `bin/*.sh` 就从这条链**直接读源码**，不渲染、不生成、不进 `__output`
+   （① 类纯源码项目，ADR-0045 §1.4 / D46）；
+2. 把 `env.zsh` / `env.bash` 并进 `$WTOOL_HOME/env.zsh` / `$WTOOL_HOME/env.bash`
+   —— rc 里那两行 source 的就是它们，`tmux()` 包装函数随之生效。
 
 `wtool uninstall terminal/tmux` 把这两件事逐条撤销。
+
+装完**新开一个 shell**（或 `source ${WTOOL_HOME}/env.zsh`）再敲 `tmux`；如果本来就有
+tmux 会话在跑，先 `tmux kill-server` 一次 —— server 握着的是它**启动那一刻**的环境
+和配置（原因见「状态栏」和「已知问题」）。
 
 ## 功能说明
 
@@ -43,22 +52,30 @@
 
 | 文件 | 作用 |
 |---|---|
-| `tmux.conf` | 配置本体；wtool 软链到 `~/.tmux.conf` |
-| `env.zsh` / `env.bash` | 两个 shell 各一份、**内容等价**；被 rc 里的 wtool 块 source |
-| `bin/*.sh` | 状态栏脚本（cpu / mem / disk / net），由 `tmux.conf` 的 `#()` 调用 |
-| `wtool.xml` | 清单：1 个 `~/.tmux.conf` 链接 + zsh / bash 两份 env |
-| `tests/env_test.sh` | env 两份等价的测试 |
+| `tmux.conf` | 配置本体；由 `tmux()` 包装函数用 `-f` 指定（**不再软链到 `~/.tmux.conf`**） |
+| `env.zsh` / `env.bash` | 两个 shell 各一份、**内容等价**；被 `$WTOOL_HOME/env.{zsh,bash}` 里的 wtool 块 source |
+| `bin/*.sh` | 状态栏脚本（cpu / mem / disk / net），由 `tmux.conf` 的 `#()` 按 L1 路径调用 |
+| `wtool.xml` | 清单：**只有两份 env 声明** —— ① 类纯源码，没有 `<link>`、没有 `<export_*>` |
+| `tests/env_test.sh` | 清单/配置形状 + env 两份等价的测试（同一张表跑两个 shell） |
+| `architecture.md` | 这个项目**现在长什么样**（链接形态、两个 shell 的约定）—— 助手看 |
 | `BACKLOG.md` | 这个项目"接下来做什么、哪条待拍板"（助手看） |
 
 ### shell 集成
 
-`env.zsh` 与 `env.bash` 做同样三件事：
+`env.zsh` 与 `env.bash` 做同样这几件事：
 
 | 名字 | 值 / 行为 |
 |---|---|
-| `WTOOL_TMUX_DIR` | 导出为 `$WTOOL_PROJECT_DIR`（wtool 给的项目稳定地址） |
-| `tmux-wtool` | 别名：`command tmux -f "$WTOOL_TMUX_DIR/tmux.conf"` —— 强制用本项目配置 |
-| 单独 source 时的兜底 | `WTOOL_PROJECT_DIR` 没设就取 `$HOME/.wtool/wtool-work-dir/links/terminal/tmux` |
+| `tmux()` | **包装函数**：`command tmux -f "$WTOOL_HOME/wtool/terminal/tmux/tmux.conf" "$@"` —— 敲 `tmux` 永远用本项目配置（ADR-0045 / D10） |
+| `WTOOL_TMUX_DIR` | 导出为 `$WTOOL_PROJECT_DIR`（引擎给的 L1 地址，即 `$WTOOL_HOME/wtool/terminal/tmux`） |
+| `tmux-wtool` | 历史遗留的别名：`command tmux -f "$WTOOL_TMUX_DIR/tmux.conf"` —— 有了包装函数之后它和直接敲 `tmux` 等价 |
+| `WTOOL_HOME` 校验 | 空 / 目录不在 → 打印"请在 rc 里加 `export WTOOL_HOME=~/.wtool` + `source ${WTOOL_HOME}/env.zsh` 两行"并以非 0 返回，**绝不静默半装**（ADR-0045 / D48） |
+| 单独 source 时的兜底 | `WTOOL_PROJECT_DIR` 没设就取 `$WTOOL_HOME/wtool/terminal/tmux` |
+
+> **`tmux()` 只活在 source 过 env 文件的 shell 里**：`cron` / `systemd` / `sh -c`
+> 拿不到它（它们也不读 rc）—— 那些地方要自己写全 `tmux -f <conf>`。
+> `WTOOL_HOME` 是**你在 rc 里声明**的，不是 env 文件自己猜的（D48）；
+> 换目录时只改 rc 里那一行 `export WTOOL_HOME=…`。
 
 ### 快捷键功能
 
@@ -138,14 +155,22 @@
 | `window-status-style` | `fg=black` | 其他窗口标签：黑字 |
 | `window-status-separator` | `\|` | 窗口之间用竖线分隔（默认空格） |
 
-`status-left` 依次调用三个脚本（按 `$HOME/.wtool/wtool-work-dir/links/terminal/tmux/bin/`
-这个稳定地址找，所以仓库搬到哪都不用改配置）：
+`status-left` 依次调用三个脚本（按 L1 路径 `$WTOOL_HOME/wtool/terminal/tmux/bin/` 找 ——
+仓库搬到哪、`$WTOOL_HOME` 指到哪，都不用改配置）：
 
 | 顺序 | 脚本 | 输出 |
 |---|---|---|
 | 1 | `bin/mem.sh` | `[M:<空闲内存> S:<空闲swap>]`，读 `free --si -h` |
 | 2 | `bin/cpu.sh` | `[C:<1分钟负载>%]`，读 `/proc/loadavg` |
 | 3 | `bin/disk.sh` | 磁盘占用；条目总长 > 40 字节时只印简写 |
+
+> **`$WTOOL_HOME` 是怎么到 `#()` 手边的**（2026-10-13 实测，tmux 3.4 + ubuntu:24.04
+> 容器，装出来的 conf 走 L1 链加载，把整屏截下来看到的就是 `[M:20G S:68G][C:0.75%][]`）：
+> ① tmux **读本文件时**就把 `$WTOOL_HOME` 展开写进选项里
+> （`tmux show-options -g status-left` 看到的是展开后的绝对路径）；
+> ② `#()` 由 **tmux server** fork 出来跑，环境就是 server 启动那一刻的环境。
+> ⚠️ 两条都吃 **server 启动时**的环境：老 server（`export WTOOL_HOME` 之前起的）
+> 看不到，`tmux kill-server` 重起即恢复；改完本条配置也要重起 server 才会重新读。
 
 > ⚠️ `bin/net.sh`（网速）**存在，但 `tmux.conf` 里没有任何地方引用它** ——
 > 状态栏只挂了 mem / cpu / disk 三个。原 `readme.md` 也写着"我打算放弃"。
@@ -173,11 +198,21 @@
 | `bin/disk.sh` / `mem.sh` / `net.sh` 的 shebang 是 `/usr/bin/zsh` | 依赖 zsh 存在；不需要可以改 `#!/bin/bash`（但见上面第一条：改了 `disk.sh` 的 shell，输出就会变成 `[]`） |
 | 原 `readme.md` 写着"`process.sh` 用来计算 cpu 占用率的方法，在 wsl1 上不会生效" | **仓库里没有 `process.sh`**（`git ls-files` 只有 cpu / disk / mem / net 四个脚本）。现在的 `bin/cpu.sh` 读 `/proc/loadavg`，是否在 wsl1 上生效**未核实** |
 
+新模型带来的三条（2026-10-13 实测记下，都不是"配置写错了"）：
+
+| 现象 | 原因 / 怎么办 |
+|---|---|
+| **`tmux -f <文件不存在>` 不报错**，静默用 tmux 默认配置 | 实测：`-f` 指向不存在的文件时 server 照起，只是 `status-left` 是默认的 `[name]`。所以 `WTOOL_HOME` 指错会表现成"命令能跑、配置没生效"—— env 文件里那段 `WTOOL_HOME` 校验就是挡这个的 |
+| 状态栏里 `$WTOOL_HOME` 展开成**空**（脚本路径变成 `/wtool/terminal/tmux/bin/mem.sh`，跑不起来） | tmux server 启动时环境里没有 `WTOOL_HOME`（老 server，或 rc 里还没加那两行）。`tmux kill-server` 重起，或补上 rc 两行 |
+| conf 里**不要**写 `\${VAR}` 或 `${VAR:-默认}` | 实测（tmux 3.4）：`${WTOOL_HOME:-UNSET}` 会让**整行 `set` 失效**、`status-left` 退回 tmux 默认值；`\$WTOOL_HOME` 会把反斜杠留给 `sh`、脚本路径解析不出来。就用 `#(sh -c 'exec "$WTOOL_HOME/…"')` 这一种写法 |
+
 ## 测试
 
 ```sh
-bash tests/env_test.sh     # 5 条：env.zsh / env.bash 给出同样的变量和别名
-                           # （条数以输出为准）没装 zsh 就只测 bash
+bash tests/env_test.sh     # 29 条（2026-10-13 实测）：清单/配置形状（没有 <link>、
+                           # 没有废弃的 wtool-work-dir/links、状态栏走 $WTOOL_HOME）
+                           # + env.zsh / env.bash 的变量、tmux() 包装函数、WTOOL_HOME 校验
+                           # （**同一张表跑两个 shell**）。条数以输出为准；没装 zsh 就只测 bash
 ```
 
 ## 迁移历史
@@ -188,5 +223,7 @@ bash tests/env_test.sh     # 5 条：env.zsh / env.bash 给出同样的变量和
 |---|---|---|
 | `wsw_env.sh` 用 `get_this_dir` 算路径 | `env.zsh` / `env.bash` 直接用 `$WTOOL_PROJECT_DIR` | 加载器已经算好了，不再需要方言相关的路径魔法 |
 | source 时 `echo "WSW_TMUX_CONF_DIR is ..."` | 去掉了 | env 文件不该有副作用（会被 source 多次） |
-| `wsw.tmux.conf` 里用 `$WSW_TMUX_CONF_DIR` | `$HOME/.wtool/wtool-work-dir/links/terminal/tmux/bin/*.sh` | 稳定路径，不依赖 tmux server 的环境变量快照 |
-| 靠 `install_all.sh` 复制安装 | 只有软链 + rc 块（wtool 做） | 改一处即生效，不再有"两份都要改"的问题 |
+| `wsw.tmux.conf` 里用 `$WSW_TMUX_CONF_DIR` | `$WTOOL_HOME/wtool/terminal/tmux/bin/*.sh`（L1 路径） | 稳定路径：仓库搬到哪、`$WTOOL_HOME` 指到哪都不用改配置 |
+| 靠 `install_all.sh` 复制安装 | 只有 L1 链 + env 块（wtool 做） | 改一处即生效，不再有"两份都要改"的问题 |
+| `~/.tmux.conf` 软链（旧模型的三段 `<link>`） | `env.*` 里的 `tmux()` 包装函数（ADR-0045 / D10，2026-10-13） | 新模型 `$HOME` 里不再有 wtool 建的软链；`<link>` 的解析已从引擎删掉（D3） |
+| `$HOME/.wtool/wtool-work-dir/links/<项目>` 中转链 | `$WTOOL_HOME/wtool/<项目>` **L1 链**（2026-10-13） | L1/L2 两类链职责分开（ADR-0045 §1.3）；老的中转目录已废弃 |
