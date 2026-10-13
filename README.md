@@ -21,10 +21,10 @@
 
 下载与安装的**唯一入口**在 GitHub 上：
 
-> **[wtool-base/README.md](https://github.com/allinkernel/wtool/blob/main/README.md)**
+> **[wtool-doc/README.md](https://github.com/allinkernel/wtool-doc/blob/main/README.md)**
 
 （URL 由清单 `.repo/manifests/default.xml` 里的 remote `ssh://git@github.com/`
-+ 项目名 `allinkernel/wtool.git` + 默认 revision `main` 拼出，不是猜的：
++ 项目名 `allinkernel/wtool-doc.git` + 默认 revision `main` 拼出，不是猜的：
 `sed -n '4,5p' .repo/manifests/default.xml` 就是 `<remote name="github" fetch="ssh://git@github.com/" />`
 和 `<default revision="main" remote="github" .../>`。）
 
