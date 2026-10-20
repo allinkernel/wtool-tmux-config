@@ -161,7 +161,7 @@ tmux 会话在跑，先 `tmux kill-server` 一次 —— server 握着的是它*
 | 顺序 | 脚本 | 输出 |
 |---|---|---|
 | 1 | `bin/mem.sh` | `[M:<可用内存> S:<可用swap>]`；读 `/proc/meminfo` 的 `MemAvailable`（没有就 `MemFree+Buffers+Cached`）/ `SwapFree`，kB 整数换算成 SI，**绝不输出负数** |
-| 2 | `bin/cpu.sh` | `[C:<1 分钟负载 / 在线 CPU 数 × 100>%]`；读 `/proc/loadavg`（单核 load 0.45 → 45%，8 核 → 6%） |
+| 2 | `bin/cpu.sh` | `[C:<1 分钟负载 / 在线 CPU 数 × 100>%]`；读 `/proc/loadavg`（单核 load 0.45 → 45%，8 核 load 0.50 → 6%） |
 | 3 | `bin/disk.sh` | 块设备白名单（`/dev/sd*`、`nvme*`、`vd*`、`mmcblk*`、`dm-*`、`xvd*`、`mapper/*`）+ WSL 盘符；条目总长 > 40 字节时只印简写；没有匹配 → `[]`；Docker 的 overlay 根 → `[/:<可用>]` |
 
 三个脚本都是 `#!/bin/sh`，**用 `env -i PATH=/usr/bin:/bin` 直接 exec 就能跑**
