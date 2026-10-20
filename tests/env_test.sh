@@ -168,5 +168,257 @@ TABLE
     # （用户 2026-10-04 拍板，删掉了原来那条断言）。
 done
 
+# ---------------------------------------------------------------------------
+# 状态栏脚本（2026-10-20）：POSIX sh，VMware Ubuntu / WSL / docker overlay 三种环境
+#
+# 为什么测这些：tmux 的 #() 环境很干净（`env -i PATH=/usr/bin:/bin`），
+# 而旧版三个脚本一个没有 shebang、两个是 `#!/usr/bin/zsh` —— 装了 wtool 版 zsh
+# 的机器上 `/usr/bin/zsh` 不存在，`#()` 直接 rc=127；mem.sh 还会打出负数
+# （free --si -h 的 G/M 后缀被 awk 当纯数字相减）。这里把这三类回归钉住。
+# ---------------------------------------------------------------------------
+printf '== 状态栏脚本（POSIX sh / 三种环境）==\n'
+bin="$proj/bin"
+sb_scripts='cpu.sh mem.sh disk.sh'
+
+# ① shebang 与 zsh 依赖
+for s in $sb_scripts; do
+    chk "$s 的 shebang 是 #!/bin/sh" "$(sed -n '1p' "$bin/$s")" '#!/bin/sh'
+done
+if grep -REn '^#!.*zsh' "$bin" >/dev/null 2>&1; then
+    bad "bin/ 里还有 zsh 的 shebang：$(grep -REn '^#!.*zsh' "$bin" | tr '\n' ' ')"
+else
+    ok "bin/ 里没有任何 #!...zsh（tmux 的 #() 不保证有 /usr/bin/zsh）"
+fi
+
+# ② 语法：sh -n + dash -n（dash 没装就跳过，和上面 zsh 那条一样）
+for s in $sb_scripts; do
+    if sh -n "$bin/$s" 2>/dev/null; then ok "$s 过 sh -n"; else bad "$s 过不了 sh -n"; fi
+    if command -v dash >/dev/null 2>&1; then
+        if dash -n "$bin/$s" 2>/dev/null; then ok "$s 过 dash -n"; else bad "$s 过不了 dash -n"; fi
+    else
+        echo "  skip $s 的 dash -n（没装 dash）"
+    fi
+done
+
+# ③ tmux 的 #() 环境：直接 exec（走 shebang），rc=0 且输出非空
+for s in $sb_scripts; do
+    out=$(env -i PATH=/usr/bin:/bin "$bin/$s" 2>&1); rc=$?
+    if [ "$rc" -eq 0 ] && [ -n "$out" ]; then
+        ok "$s 在 env -i 下 rc=0 且有输出（$out）"
+    else
+        bad "$s 在 env -i 下 rc=$rc，输出 [$out]"
+    fi
+done
+
+# 用 dash 真跑一遍（sh -n 过 ≠ dash 跑得起来）
+if command -v dash >/dev/null 2>&1; then
+    for s in $sb_scripts; do
+        out=$(env -i PATH=/usr/bin:/bin dash "$bin/$s" 2>&1); rc=$?
+        if [ "$rc" -eq 0 ] && [ -n "$out" ]; then
+            ok "$s 在 dash 下真跑 rc=0（$out）"
+        else
+            bad "$s 在 dash 下真跑 rc=$rc，输出 [$out]"
+        fi
+    done
+fi
+
+# ④ mem.sh：合成 /proc/meminfo。**任何一条都不许出现负号。**
+mid="$T/meminfo"; mkdir -p "$mid"
+cat > "$mid/normal" <<'EOF'
+MemTotal:       16384000 kB
+MemFree:         2000000 kB
+MemAvailable:    8192000 kB
+Buffers:          100000 kB
+Cached:          1000000 kB
+SwapTotal:       2097152 kB
+SwapFree:        2097152 kB
+EOF
+cat > "$mid/noavail" <<'EOF'
+MemTotal:        8000000 kB
+MemFree:         3000000 kB
+Buffers:          100000 kB
+Cached:           900000 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+EOF
+cat > "$mid/tiny" <<'EOF'
+MemTotal:          204800 kB
+MemAvailable:       20480 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+EOF
+cat > "$mid/clamp" <<'EOF'
+MemTotal:         1000000 kB
+MemAvailable:     2000000 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+EOF
+cat > "$mid/zero" <<'EOF'
+MemTotal:       16384000 kB
+MemAvailable:          0 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+EOF
+cat > "$mid/hugebad" <<'EOF'
+MemTotal:       16384000 kB
+MemAvailable: 999999999999999 kB
+MemFree:         1048576 kB
+Buffers:               0 kB
+Cached:                0 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+EOF
+cat > "$mid/hugevalid" <<'EOF'
+MemTotal:       16384000 kB
+MemAvailable:  999999999999 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+EOF
+cat > "$mid/negfield" <<'EOF'
+MemTotal:       16384000 kB
+MemAvailable:         -5 kB
+MemFree:         1048576 kB
+Buffers:               0 kB
+Cached:                0 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+EOF
+
+mem_case() {   # <标签> <meminfo 文件> <期望输出>
+    out=$(env -i PATH=/usr/bin:/bin sh "$bin/mem.sh" "$2" 2>&1)
+    case $out in
+        *-*) bad "mem.sh[$1] 输出里有负号：$out" ;;
+        *)   ok "mem.sh[$1] 没有负数" ;;
+    esac
+    chk "mem.sh[$1]" "$out" "$3"
+}
+mem_case normal    "$mid/normal"    '[M:8.3G S:2.1G]'
+mem_case noavail   "$mid/noavail"   '[M:4G S:0B]'
+mem_case tiny      "$mid/tiny"      '[M:20.9M S:0B]'
+mem_case clamp     "$mid/clamp"     '[M:1G S:0B]'
+mem_case zero      "$mid/zero"      '[M:0B S:0B]'
+mem_case hugebad   "$mid/hugebad"   '[M:1G S:0B]'
+mem_case hugevalid "$mid/hugevalid" '[M:16.7G S:0B]'
+mem_case negfield  "$mid/negfield"  '[M:1G S:0B]'
+chk "mem.sh 读不到 meminfo → [M:? S:?]" \
+    "$(env -i PATH=/usr/bin:/bin sh "$bin/mem.sh" "$mid/no-such-file" 2>&1)" '[M:? S:?]'
+
+# ⑤ disk.sh：合成 df（**不是**合成 /proc）。df 桩从 $DF_FIXTURE 读那份输出。
+dff="$T/dfbin"; mkdir -p "$dff" "$T/df"
+cat > "$dff/df" <<'EOF'
+#!/bin/sh
+cat "${DF_FIXTURE:?}"
+EOF
+chmod +x "$dff/df"
+disk_case() { env -i PATH="$dff:/usr/bin:/bin" DF_FIXTURE="$1" sh "$bin/disk.sh"; }
+
+cat > "$T/df/vm" <<'EOF'
+Filesystem 1024-blocks Used Available Capacity Mounted on
+/dev/sda1 1048576 524288 524288 50% /boot
+/dev/nvme0n1p2 20971520 10485760 10485760 50% /
+/dev/vda1 5242880 1048576 4194304 20% /data
+/dev/mmcblk0p1 1048576 1048576 0 100% /mnt/sd
+/dev/dm-0 10485760 5242880 5242880 50% /var
+/dev/xvda1 2097152 1048576 1048576 50% /x
+/dev/mapper/vg-root 4194304 1048576 3145728 25% /srv
+overlay 1000000 500000 500000 50% /var/lib/docker/overlay2/abc
+tmpfs 65536 0 65536 0% /run
+udev 65536 0 65536 0% /dev
+squashfs 128 128 0 100% /snap/foo
+/dev/loop0 65536 65536 0 100% /snap/loop
+EOF
+cat > "$T/df/overlay" <<'EOF'
+Filesystem 1024-blocks Used Available Capacity Mounted on
+overlay 1055762868 687716444 314342952 69% /
+tmpfs 65536 0 65536 0% /run
+udev 65536 0 65536 0% /dev
+squashfs 128 128 0 100% /snap/foo
+/dev/loop0 65536 65536 0 100% /snap/loop
+EOF
+cat > "$T/df/tmpfs" <<'EOF'
+Filesystem 1024-blocks Used Available Capacity Mounted on
+tmpfs 65536 0 65536 0% /
+udev 65536 0 65536 0% /dev
+EOF
+cat > "$T/df/wsl" <<'EOF'
+Filesystem 1024-blocks Used Available Capacity Mounted on
+none 12818488 0 12818488 0% /usr/lib/modules/x
+drivers 243104764 223649032 19455732 92% /usr/lib/wsl/drivers
+/dev/sdd 1055762868 687705952 314353444 69% /
+C:\ 243104764 223649032 19455732 92% /mnt/c
+D:\ 1073741820 798426480 275315340 75% /mnt/d
+tmpfs 12818488 0 12818488 0% /run/qemu
+EOF
+cat > "$T/df/filebind" <<'EOF'
+Filesystem 1024-blocks Used Available Capacity Mounted on
+overlay 1055762868 687716444 314342952 69% /
+/dev/sdd 1055762868 687705952 314353444 69% /etc/hosts
+/dev/sdd 1055762868 687705952 314353444 69% /etc/hostname
+tmpfs 65536 0 65536 0% /dev/shm
+EOF
+printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\n' > "$T/df/empty"
+
+out=$(disk_case "$T/df/vm"); rc=$?
+chk "disk.sh VM 白名单 rc" "$rc" 0
+for want in /dev/sda1 /dev/nvme0n1p2 /dev/vda1 /dev/mmcblk0p1 /dev/dm-0 /dev/xvda1 /dev/mapper/vg-root; do
+    case $out in
+        *"$want"*) ok "disk.sh 收录 $want" ;;
+        *)         bad "disk.sh 漏了 $want（$out）" ;;
+    esac
+done
+for no in overlay tmpfs udev squashfs loop0 snap; do
+    case $out in
+        *"$no"*) bad "disk.sh 误报 $no（$out）" ;;
+        *)       ok "disk.sh 不误报 $no" ;;
+    esac
+done
+
+out=$(disk_case "$T/df/overlay"); rc=$?
+chk "disk.sh docker overlay 根 → 根分区可用量" "$out" '[/:299.7G]'
+chk "disk.sh docker overlay rc" "$rc" 0
+case $out in
+    *overlay*|*tmpfs*|*udev*|*squashfs*|*loop0*)
+        bad "disk.sh 把 overlay 的伪设备当磁盘了（$out）" ;;
+    *) ok "disk.sh overlay 兜底里没有伪设备名字" ;;
+esac
+
+chk "disk.sh 根是 tmpfs → []（不冒充磁盘）" "$(disk_case "$T/df/tmpfs")" '[]'
+chk "disk.sh 只有表头 → []" "$(disk_case "$T/df/empty")" '[]'
+
+out=$(disk_case "$T/df/wsl")
+for want in '/dev/sdd' 'C:\' 'D:\'; do
+    case $out in
+        *"$want"*) ok "disk.sh WSL 收录 $want" ;;
+        *)         bad "disk.sh WSL 漏了 $want（$out）" ;;
+    esac
+done
+for no in none drivers; do
+    case $out in
+        *"$no"*) bad "disk.sh WSL 误报 $no（$out）" ;;
+        *)       ok "disk.sh WSL 不误报 $no" ;;
+    esac
+done
+
+chk "disk.sh 跳过单文件 bind（/etc/hosts）→ overlay 根" \
+    "$(disk_case "$T/df/filebind")" '[/:299.7G]'
+
+# ⑥ cpu.sh：1 核 / 8 核 / 2 核各一条，外加真实 /proc/loadavg 与文件不存在
+la="$T/loadavg"
+printf '0.50 0.40 0.30 1/100 1234\n' > "$la"
+chk "cpu.sh 单核 load 0.50 → 50%" \
+    "$(env -i PATH=/usr/bin:/bin WTOOL_NCPU=1 sh "$bin/cpu.sh" "$la")" '[C:50%]'
+chk "cpu.sh 8 核 load 0.50 → 6%" \
+    "$(env -i PATH=/usr/bin:/bin WTOOL_NCPU=8 sh "$bin/cpu.sh" "$la")" '[C:6%]'
+printf '3.00 2.00 1.00 1/100 1234\n' > "$T/loadavg3"
+chk "cpu.sh 2 核 load 3.00 → 150%" \
+    "$(env -i PATH=/usr/bin:/bin WTOOL_NCPU=2 sh "$bin/cpu.sh" "$T/loadavg3")" '[C:150%]'
+out=$(env -i PATH=/usr/bin:/bin sh "$bin/cpu.sh")
+case $out in
+    \[C:*%\]) ok "cpu.sh 真实 /proc/loadavg → $out" ;;
+    *)        bad "cpu.sh 真实 /proc/loadavg 输出不对（$out）" ;;
+esac
+chk "cpu.sh loadavg 不存在 → [C:?]" \
+    "$(env -i PATH=/usr/bin:/bin sh "$bin/cpu.sh" "$T/no-such-loadavg" 2>&1)" '[C:?]'
+
 printf '\n%d 通过, %d 失败\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

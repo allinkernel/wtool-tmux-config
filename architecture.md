@@ -49,10 +49,11 @@ $HOME 里：**什么都没有**（没有 ~/.tmux.conf；rc 里只有那两行 ex
 | 谁 | 读什么 | 怎么找到 |
 |---|---|---|
 | 敲 `tmux` | `$WTOOL_HOME/wtool/terminal/tmux/tmux.conf` | `env.*` 里的包装函数 `tmux() { command tmux -f "$WTOOL_HOME/wtool/terminal/tmux/tmux.conf" "$@"; }`（**D10**） |
-| `tmux.conf` 的状态栏 | 同目录 `bin/{mem,cpu,disk}.sh` | `#(sh -c 'exec "$WTOOL_HOME/wtool/terminal/tmux/bin/mem.sh"')` 这类写法 |
+| `tmux.conf` 的状态栏 | 同目录 `bin/{mem,cpu,disk}.sh`（**POSIX sh**，数据源见 §3.1） | `#(sh -c 'exec "$WTOOL_HOME/wtool/terminal/tmux/bin/mem.sh"')` 这类写法 |
 
 `$WTOOL_HOME` 的来路（**2026-10-13 在 `ubuntu:24.04` + tmux 3.4 容器里实测**，
-装了之后把整屏截下来看到 `[M:20G S:68G][C:0.75%][]`）：
+装了之后把整屏截下来看到 `[M:20G S:68G][C:0.75%][]`；当时 `disk.sh` 还是旧版，
+2026-10-20 起容器里是 `[/:<可用>]`）：
 
 1. tmux **读 conf 时**就把 `$WTOOL_HOME` 展开存进选项 ——
    `tmux show-options -g status-left` 看到的是绝对路径；
@@ -65,6 +66,21 @@ $HOME 里：**什么都没有**（没有 ~/.tmux.conf；rc 里只有那两行 ex
 会让整行 `set` 失效（退回 tmux 默认 `status-left`），`\$WTOOL_HOME` 会把反斜杠留给 `sh`。
 ⇒ `tmux -f <文件不存在>` **不报错**，静默用默认配置（实测）——所以 `WTOOL_HOME` 指错
 表现成"命令能跑、配置没在"。挡它的就是 env 里那段校验。
+
+### 3.1 状态栏脚本（2026-10-20 重写）
+
+三个脚本都是 **POSIX `#!/bin/sh`**，不依赖 zsh/bash，也不依赖 `free` 的人类可读输出 ——
+tmux `#()` 的环境按 `env -i PATH=/usr/bin:/bin` 处理（测试里就是这么跑的）。
+
+| 脚本 | 数据源 | 输出 / 判据 |
+|---|---|---|
+| `mem.sh` | `/proc/meminfo`（可选参数 = 测试用文件） | `[M:<可用> S:<可用swap>]`。可用 = `MemAvailable`，没有就 `MemFree+Buffers+Cached`；swap = `SwapFree`。**一律 kB 整数运算**（meminfo 的 kB 是 KiB，换算 SI 时先 ×1024），夹到 `MemTotal`/`SwapTotal` 以内；算不出来输出 `?`，**永不输出负数** |
+| `cpu.sh` | `/proc/loadavg`（可选参数 = 测试用文件） | `[C:<load1 / 在线CPU数 ×100>%]`。CPU 数按 `WTOOL_NCPU`（测试）→ `getconf` → `nproc` → `/proc/stat` 兜底；1 核 load 0.45 = 45%，8 核 = 5% |
+| `disk.sh` | `df -P -k`（测试用 `df` 桩走 PATH） | 白名单：`/dev/sd*`、`nvme*`、`vd*`、`mmcblk*`、`dm-*`、`xvd*`、`mapper/*`，外加 WSL 的 `C:\` 盘符；单文件 bind（`/etc/hosts` 等）跳过。有设备：`挂载点:已用/总量`，>40 字节转 `设备:可用` 简写；没有设备：Docker 的 overlay 根 → `[/:<可用>]`，否则 `[]`（rc=0） |
+
+为什么旧版在 Ubuntu 上打负数（根因留在 `README.md`「已知问题」）：旧版拿
+`free --si -h` 的**人类可读字符串**做减法，`4.1G - 604M` 被 awk 算成 `4.1 - 604`。
+WSL 上两端恰好都在 G 档，所以只有 Ubuntu 上暴露。
 
 ## 4. 两个 shell 的约定
 
@@ -102,8 +118,10 @@ diff <(sed 's/zsh/SH/g; s/bash/SH/g' env.zsh) <(sed 's/zsh/SH/g; s/bash/SH/g' en
 ## 6. 测试
 
 ```sh
-bash tests/env_test.sh     # 29 条（2026-10-13 实测）：§1 的三条形状判据 + 两个 shell
+bash tests/env_test.sh     # 92 条（2026-10-20 实测）：§1 的三个形状判据 + 两个 shell
                            # 同一张表（tmux() 传参、WTOOL_HOME 三种坏值的校验、别名、变量）
+                           # + §3.1 三个脚本（env -i / 合成 meminfo 无负数 / df 白名单
+                           #   与 overlay 兜底 / sh -n + dash -n / 没有 zsh shebang）
 ```
 
 只读、不碰真 `$HOME`：`WTOOL_HOME` 指向 `mktemp -d`，`PATH` 前面挂一个 tmux 桩，

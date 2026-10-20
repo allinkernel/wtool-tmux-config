@@ -38,6 +38,37 @@ README「已知问题」里记着）。助手没动它。
 
 ## ✅ 做完的
 
+- **2026-10-20 状态栏三个脚本改成 POSIX sh（cpu / mem / disk）** —— 提交见 `git log ds_dev`。
+
+  **修了什么**（根因写在 README「已知问题」+ `architecture.md` §3.1）：
+  1. **shebang**：`mem.sh` / `disk.sh` 的 `#! /usr/bin/zsh`、`cpu.sh` 没有 shebang →
+      一律 `#!/bin/sh`，只用 POSIX 语法。装了 wtool 版 zsh 之后 `<项目>/bin` 里
+      `/usr/bin/zsh` 不一定存在；`ubuntu:24.04` 容器里本来就没有，实测
+      `env -i PATH=/usr/bin:/bin sh -c 'exec …/mem.sh'` → `not found`（rc=127）。
+  2. **mem 负数**：旧版 `free --si -h | awk '{printf "%sG",$2-$3}'` 把 `4.1G` / `604M`
+      当纯数字相减，算成 `4.1 - 604 = -599.9`。WSL 上 total/used 恰好都在 G 档
+      （`26G-6.5G=19.5`）所以看不出来；用合成 4 GB meminfo + 容器里**真的 `free`**
+      复现出 `[M:-599.9G S:2.1G]`。新版读 `/proc/meminfo` 的 kB 整数，优先
+      `MemAvailable`，没有就 `MemFree+Buffers+Cached`，夹到 `MemTotal` 以内，
+      **永不输出负数**。
+  3. **disk**：`df -P -k` + 设备白名单（`sd` / `nvme` / `vd` / `mmcblk` / `dm-` /
+      `xvd` / `mapper` + WSL 盘符），单文件 bind 跳过；无匹配 → `[]`；Docker 的
+      overlay 根 → `[/:<可用>]`。旧版 `df -h | while` 的变量在 dash/bash 下会丢
+      （zsh 让管道最后一段在当前 shell 才没暴露），新版用 here-doc 喂 `while`。
+
+  **验证到什么程度**：
+  - 宿主 WSL 真实输出：`[M:19.7G S:68.7G]` / `[C:1%]` /
+    `[/dev/sdd:299.7G C:\18.5G D:\262.5G E:\1.2T]`；
+  - `docker run --rm ubuntu:24.04`（脚本 tar 进去、**不挂块设备**）：
+    `env -i PATH=/usr/bin:/bin` 下三个都 rc=0，`disk.sh` → `[/:299.7G]`；
+  - `tmux 3.4` 容器里 conf 能解析、`status-left` 里的 `$WTOOL_HOME` 展开成 `/wh`；
+  - **VMware 虚拟机没有真机**：用合成 `/proc/meminfo`（4 GB / 604M used）和合成
+    `df`（`/dev/sda1`、`nvme0n1p2`、`vda1`、`mmcblk0p1`、`dm-0`、`xvda1`）覆盖，
+    **未真验、只合成**；
+  - `bash tests/env_test.sh` → **92 通过 / 0 失败**（29 → 92）。
+
+  **没动**：`bin/net.sh`（仍硬编码 `ens33`，状态栏没引用；上面「⏸ 待拍板 2」还在）。
+
 - **2026-10-13 按 ADR-0045 新架构改造（① 类纯源码项目）** —— 提交见 `git log ds_dev`。
 
   **现象**：对 `terminal/tmux` 跑 `wtool install` 直接报错、rc=2、装不上：
@@ -70,7 +101,8 @@ README「已知问题」里记着）。助手没动它。
     attach 也照样能拿到（值来自 **server 启动时的环境**）——所以**不需要**退回"安装时渲染"；
   - 端到端：装出来的 conf 用真 tmux 3.4 起 server + pty 客户端截屏，状态栏是
     `[M:20G S:68G][C:0.75%][]`（mem / cpu 正常；disk 在容器里本来就空 —— `df` 没有
-    `/dev/sd*`，不是坏了）；
+    `/dev/sd*`，不是坏了）。（2026-10-20 已修：容器里 `disk.sh` 现在输出
+    `[/:<可用>]`，见上面那条。）
   - `bash tests/env_test.sh` → **29 通过 / 0 失败**。
 
   **顺带记下的三条坑**（写进 README「已知问题」+ `architecture.md` §3 + AGENTS 铁律 6）：
@@ -83,4 +115,4 @@ README「已知问题」里记着）。助手没动它。
   zsh 让管道最后一段在当前 shell 里跑）；补容器装/测规矩；键位表标出 main/ds_dev 差异；
   补全 `status-right` 的 tmux 默认值；修正 `AGENTS.md` 里"改 `tmux.conf` 后实测"的配方
   （要 dump `prefix` **和** `root` 两张表，`-n` 的绑定落在 root 表）。
-  测试：`bash tests/env_test.sh` → 5 通过 / 0 失败（当时；现在是 29 条）。
+  测试：`bash tests/env_test.sh` → 5 通过 / 0 失败（当时；2026-10-20 起是 92 条）。

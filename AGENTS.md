@@ -82,13 +82,15 @@
 ## 测试
 
 ```sh
-cd terminal/tmux && bash tests/env_test.sh   # 29 条，应全绿（2026-10-13 实测；条数以输出为准）
+cd terminal/tmux && bash tests/env_test.sh   # 92 条，应全绿（2026-10-20 实测；条数以输出为准）
 ```
 
-只读、不碰 `$HOME`、不联网。它测三类东西：① 清单/配置形状（`wtool.xml` 没有 `<link>` /
+只读、不碰 `$HOME`、不联网。它测四类东西：① 清单/配置形状（`wtool.xml` 没有 `<link>` /
 `<export_*>`、`tmux.conf` 与 `env.*` 里没有废弃的 `wtool-work-dir/links`、状态栏走
 `$WTOOL_HOME/…`）② 两个 shell **同一张表**（`tmux()` 传了什么参数、`WTOOL_HOME` 三种坏值
-都报错退出）③ `WTOOL_TMUX_DIR` / `tmux-wtool` 还在。改完 `env.zsh` / `env.bash` 必须跑。
+都报错退出）③ `WTOOL_TMUX_DIR` / `tmux-wtool` 还在 ④ 状态栏三个脚本（`env -i` 直接 exec、
+合成 `/proc/meminfo` 不许出负数、合成 `df` 的白名单/overlay 兜底、`sh -n` + `dash -n`、
+`bin/` 下没有 zsh shebang）。改完 `env.zsh` / `env.bash` / `bin/*.sh` 必须跑。
 
 **改 `tmux.conf` 之后建议再做一次实测**（配置能不能被 tmux 解析、键位到底生效成什么），
 这套命令不用真终端、用完自己清掉。**注意要 dump 两张表**：`-n` 的绑定落在 **root 表**

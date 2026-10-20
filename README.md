@@ -54,7 +54,7 @@ tmux 会话在跑，先 `tmux kill-server` 一次 —— server 握着的是它*
 |---|---|
 | `tmux.conf` | 配置本体；由 `tmux()` 包装函数用 `-f` 指定（**不再软链到 `~/.tmux.conf`**） |
 | `env.zsh` / `env.bash` | 两个 shell 各一份、**内容等价**；被 `$WTOOL_HOME/env.{zsh,bash}` 里的 wtool 块 source |
-| `bin/*.sh` | 状态栏脚本（cpu / mem / disk / net），由 `tmux.conf` 的 `#()` 按 L1 路径调用 |
+| `bin/*.sh` | 状态栏脚本（cpu / mem / disk / net）。**cpu / mem / disk 是 POSIX `#!/bin/sh`**（2026-10-20 重写），由 `tmux.conf` 的 `#()` 按 L1 路径调用；`net.sh` 没被引用 |
 | `wtool.xml` | 清单：**只有两份 env 声明** —— ① 类纯源码，没有 `<link>`、没有 `<export_*>` |
 | `tests/env_test.sh` | 清单/配置形状 + env 两份等价的测试（同一张表跑两个 shell） |
 | `architecture.md` | 这个项目**现在长什么样**（链接形态、两个 shell 的约定）—— 助手看 |
@@ -160,12 +160,17 @@ tmux 会话在跑，先 `tmux kill-server` 一次 —— server 握着的是它*
 
 | 顺序 | 脚本 | 输出 |
 |---|---|---|
-| 1 | `bin/mem.sh` | `[M:<空闲内存> S:<空闲swap>]`，读 `free --si -h` |
-| 2 | `bin/cpu.sh` | `[C:<1分钟负载>%]`，读 `/proc/loadavg` |
-| 3 | `bin/disk.sh` | 磁盘占用；条目总长 > 40 字节时只印简写 |
+| 1 | `bin/mem.sh` | `[M:<可用内存> S:<可用swap>]`；读 `/proc/meminfo` 的 `MemAvailable`（没有就 `MemFree+Buffers+Cached`）/ `SwapFree`，kB 整数换算成 SI，**绝不输出负数** |
+| 2 | `bin/cpu.sh` | `[C:<1 分钟负载 / 在线 CPU 数 × 100>%]`；读 `/proc/loadavg`（单核 load 0.45 → 45%，8 核 → 6%） |
+| 3 | `bin/disk.sh` | 块设备白名单（`/dev/sd*`、`nvme*`、`vd*`、`mmcblk*`、`dm-*`、`xvd*`、`mapper/*`）+ WSL 盘符；条目总长 > 40 字节时只印简写；没有匹配 → `[]`；Docker 的 overlay 根 → `[/:<可用>]` |
+
+三个脚本都是 `#!/bin/sh`，**用 `env -i PATH=/usr/bin:/bin` 直接 exec 就能跑**
+（tmux 的 `#()` 环境就是这个样子）：不依赖 zsh、不依赖 `free` 的人类可读输出。
+判据：`env -i PATH=/usr/bin:/bin bin/mem.sh` → 非空、rc=0（测试里有这一条）。
 
 > **`$WTOOL_HOME` 是怎么到 `#()` 手边的**（2026-10-13 实测，tmux 3.4 + ubuntu:24.04
-> 容器，装出来的 conf 走 L1 链加载，把整屏截下来看到的就是 `[M:20G S:68G][C:0.75%][]`）：
+> 容器，装出来的 conf 走 L1 链加载，当时截屏看到的是 `[M:20G S:68G][C:0.75%][]`；
+> 2026-10-20 起 `disk.sh` 在容器里输出 `[/:<可用>]`，不再是 `[]`）：
 > ① tmux **读本文件时**就把 `$WTOOL_HOME` 展开写进选项里
 > （`tmux show-options -g status-left` 看到的是展开后的绝对路径）；
 > ② `#()` 由 **tmux server** fork 出来跑，环境就是 server 启动那一刻的环境。
@@ -189,14 +194,21 @@ tmux 会话在跑，先 `tmux kill-server` 一次 —— server 握着的是它*
 
 ## 已知问题
 
-保持原样迁移、未改动：
+### 2026-10-20 已修：三个状态栏脚本改成 POSIX sh
+
+| 原问题 | 根因 | 现在的做法 |
+|---|---|---|
+| `mem.sh` / `disk.sh` 的 shebang 是 `#! /usr/bin/zsh`（`cpu.sh` 连 shebang 都没有） | 装了 wtool 版 zsh 后，宿主 `zsh` 是 `~/.wtool/usr/bin/zsh`（可重定位），`/usr/bin/zsh` **不一定存在**；tmux 的 `#()` 直接 exec 脚本，shebang 找不到 → `not found`（rc=127）。`ubuntu:24.04` 容器里本来就没有 `/usr/bin/zsh`，`env -i PATH=/usr/bin:/bin sh -c 'exec …/mem.sh'` 实测复现 | 三个都 `#!/bin/sh`，只用 POSIX 语法；容器里 `env -i` 直接 exec 通过 |
+| `mem.sh` 在 Ubuntu 上打出**负数**（WSL 上正常） | `free --si -h` 给的是**带单位的人类可读数**（`4.1G` / `604M`）；`awk '{printf "%sG",$2-$3}'` 把后缀当没看见，算的是 `4.1-604 = -599.9`。WSL 上 total/used 恰好都在 G 档（`26G-6.5G=19.5`），所以一直没暴露；4 GB 的 Ubuntu 虚拟机 used 是 `604M` 就立刻变负 | 读 `/proc/meminfo` 的 kB 整数；优先 `MemAvailable`，没有就 `MemFree+Buffers+Cached`；夹到 `MemTotal` 以内；算不出来输出 `?`，**永不输出负数** |
+| `disk.sh` 的 `while read` 在**管道**里跑 | 原 README 在 `f364365` 里把结论写成"赋值出不了子 shell"是**错的**：zsh 让管道**最后一段在当前 shell 里跑**，所以 zsh 下赋值留得住；换 bash/dash 才变成 `[]` | 先把 `df -P -k` 抓进变量，再用 here-doc 喂 `while`（循环在当前 shell）；全程不解析 `df -h` |
+| `disk.sh` 只认 `[C-Z]:\` 和 `/dev/sd[a-z][0-9]` 两种设备 | `/dev/sdd`（WSL 根，没有分区号）、`nvme` / `vd` / `mmcblk` / `dm-*` 都不认；Docker 根是 overlay → `[]` | 设备白名单 + `df -P`（见上面「状态栏」）；没有匹配 → `[]`；Docker 的 overlay 根 → `[/:<可用>]`（判据：没有白名单设备，且 `/` 的 filesystem 是 `overlay`/`overlayfs`） |
+
+仍然保留的两条：
 
 | 问题 | 说明 |
 |---|---|
-| `bin/disk.sh` 的 `while read` 在**管道**里跑 | ⚠️ **原结论已订正**（旧 README 在 `f364365` 里写成"赋值出不了子 shell，最终输出可能是 `[]`"，那是**错的**）：脚本自己的 shebang 是 **zsh**，而 zsh 让管道**最后一段在当前 shell 里跑**，赋值留得下来，输出是对的。只有**换 bash/dash 跑**才会出 `[]`。判据：`zsh bin/disk.sh` → `[C:\16G D:\300G E:\1.5T ]`；`bash bin/disk.sh` → `[]`（zsh 5.9 实测）。反正 `tmux.conf` 的 `#()` 走 shebang，行为是对的 —— 保持原样不改 |
-| `bin/net.sh` 硬编码网卡名 `ens33` | 原 `readme.md` 写着"在部分机器上也不会生效，所以我打算放弃"；而且它没被 `tmux.conf` 引用 |
-| `bin/disk.sh` / `mem.sh` / `net.sh` 的 shebang 是 `/usr/bin/zsh` | 依赖 zsh 存在；不需要可以改 `#!/bin/bash`（但见上面第一条：改了 `disk.sh` 的 shell，输出就会变成 `[]`） |
-| 原 `readme.md` 写着"`process.sh` 用来计算 cpu 占用率的方法，在 wsl1 上不会生效" | **仓库里没有 `process.sh`**（`git ls-files` 只有 cpu / disk / mem / net 四个脚本）。现在的 `bin/cpu.sh` 读 `/proc/loadavg`，是否在 wsl1 上生效**未核实** |
+| `bin/net.sh` 硬编码网卡名 `ens33` | 原 `readme.md` 写着"在部分机器上也不会生效，所以我打算放弃"；而且它没被 `tmux.conf` 引用（状态栏只挂 mem / cpu / disk） |
+| 原 `readme.md` 写着"`process.sh` 用来计算 cpu 占用率的方法，在 wsl1 上不会生效" | **仓库里没有 `process.sh`**（`git ls-files` 只有 cpu / disk / mem / net 四个脚本）。现在的 `bin/cpu.sh` 读 `/proc/loadavg`；WSL1 未真验 |
 
 新模型带来的三条（2026-10-13 实测记下，都不是"配置写错了"）：
 
@@ -209,10 +221,14 @@ tmux 会话在跑，先 `tmux kill-server` 一次 —— server 握着的是它*
 ## 测试
 
 ```sh
-bash tests/env_test.sh     # 29 条（2026-10-13 实测）：清单/配置形状（没有 <link>、
+bash tests/env_test.sh     # 92 条（2026-10-20 实测）：清单/配置形状（没有 <link>、
                            # 没有废弃的 wtool-work-dir/links、状态栏走 $WTOOL_HOME）
                            # + env.zsh / env.bash 的变量、tmux() 包装函数、WTOOL_HOME 校验
-                           # （**同一张表跑两个 shell**）。条数以输出为准；没装 zsh 就只测 bash
+                           # （**同一张表跑两个 shell**）
+                           # + 状态栏三个脚本：env -i / sh -n + dash -n / 合成 meminfo
+                           #   （正常、无 MemAvailable、极小、异常大值、负数字段，全都不许负）
+                           #   / df 白名单（VM / WSL / overlay / tmpfs / 单文件 bind）
+                           # 条数以输出为准；没装 zsh 就只测 bash，没装 dash 就跳过 dash
 ```
 
 ## 迁移历史
